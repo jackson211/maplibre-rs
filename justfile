@@ -4,7 +4,7 @@
 
 set shell := ["bash", "-c"]
 
-export NIGHTLY_TOOLCHAIN := "nightly-2022-04-04-x86_64-unknown-linux-gnu"
+export NIGHTLY_TOOLCHAIN := "nightly-2022-07-03-x86_64-unknown-linux-gnu"
 export CARGO_TERM_COLOR := "always"
 export RUST_BACKTRACE := "1"
 
@@ -36,14 +36,14 @@ test PROJECT ARCH:
 benchmark:
   cargo bench -p benchmarks
 
-install-rustfmt:
-  rustup component add rustfmt
+install-rustfmt: nightly-toolchain
+  rustup component add rustfmt --toolchain $NIGHTLY_TOOLCHAIN
 
 fmt: install-rustfmt
-  cargo fmt --all --
+  export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cargo fmt
 
 fmt-check: install-rustfmt
-  cargo fmt --all -- --check
+  export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cargo fmt -- --check
 
 default-toolchain:
   # Setups the toolchain from rust-toolchain.toml
