@@ -14,16 +14,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - name: Setup binstall
-        uses: ./.github/actions/setup-binstall
-      - name: Install just
-        uses: ./.github/actions/cargo-install
-        with:
-          name: just
-      - name: Install toolchain
-        shell: bash
-        run: just stable-toolchain
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup
+        uses: ./.github/actions/setup
       - name: Install mdbook
         uses: ./.github/actions/cargo-install
         with:
@@ -34,7 +26,9 @@ jobs:
       - name: Build
         working-directory: docs
         shell: bash
-        run: mdbook build
+        run: |
+          ./generate-summary.sh
+          mdbook build
       - name: API Documentation
         shell: bash
         run: cargo doc -p maplibre --no-deps --lib --document-private-items

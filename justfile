@@ -14,6 +14,9 @@ export RUST_BACKTRACE := "1"
 stable-toolchain:
   rustup toolchain install $STABLE_TOOLCHAIN
 
+stable-override-toolchain:
+  rustup override set $STABLE_TOOLCHAIN
+
 stable-targets *FLAGS:
   rustup toolchain install $STABLE_TOOLCHAIN --target {{FLAGS}}
 
@@ -23,6 +26,9 @@ stable-install-clippy:
 
 nightly-toolchain:
   rustup toolchain install $NIGHTLY_TOOLCHAIN
+
+nightly-override-toolchain:
+  rustup override set $NIGHTLY_TOOLCHAIN
 
 nightly-targets *FLAGS:
   rustup toolchain install $NIGHTLY_TOOLCHAIN --target {{FLAGS}}
@@ -91,8 +97,16 @@ web-test FEATURES: nightly-toolchain
 #profile-bench:
 # cargo flamegraph --bench render -- --bench
 
-build-android: nightly-toolchain print-android-env
-  export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cd android/gradle && ./gradlew assembleDebug
+build-android: build-android-lib build-android-demo
+
+build-android-lib: nightly-toolchain print-android-env
+  export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cd android/gradle && ./gradlew :lib:assembleDebug
+
+build-android-demo: nightly-toolchain print-android-env
+  export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cd android/gradle && ./gradlew :demo:assembleDebug
+
+install-android-demo: nightly-toolchain print-android-env
+  export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cd android/gradle && ./gradlew :demo:installDebug
 
 test-android TARGET: nightly-toolchain print-android-env
   export RUSTUP_TOOLCHAIN=$NIGHTLY_TOOLCHAIN && cargo test -p maplibre-android --target {{TARGET}} -Z build-std=std,panic_abort
