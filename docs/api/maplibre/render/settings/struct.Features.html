@@ -17,12 +17,10 @@ shadow map occluders to be rendered into a tighter depth range.</p>
 <li>some mobile chips</li>
 </ul>
 <p>This is a web and native feature.</p>
-</div></details><details class="rustdoc-toggle" open><summary><section id="associatedconstant.DEPTH24PLUS_STENCIL8" class="associatedconstant has-srclink"><h4 class="code-header">pub const <a href="#associatedconstant.DEPTH24PLUS_STENCIL8" class="constant">DEPTH24PLUS_STENCIL8</a>: <a class="struct" href="struct.Features.html" title="struct maplibre::render::settings::Features">Features</a> = Self{bits: 1 &lt;&lt; 1,}</h4></section></summary><div class="docblock"><p>Allows for explicit creation of textures of format <a href="enum.TextureFormat.html#variant.Depth24PlusStencil8" title="TextureFormat::Depth24PlusStencil8"><code>TextureFormat::Depth24PlusStencil8</code></a></p>
+</div></details><details class="rustdoc-toggle" open><summary><section id="associatedconstant.DEPTH24PLUS_STENCIL8" class="associatedconstant has-srclink"><h4 class="code-header">pub const <a href="#associatedconstant.DEPTH24PLUS_STENCIL8" class="constant">DEPTH24PLUS_STENCIL8</a>: <a class="struct" href="struct.Features.html" title="struct maplibre::render::settings::Features">Features</a> = Self{bits: 1 &lt;&lt; 1,}</h4></section></summary><div class="docblock"><p>Does nothing.</p>
 <p>Supported platforms:</p>
 <ul>
-<li>Vulkan (some)</li>
-<li>DX12</li>
-<li>Metal (Macs with amd GPUs)</li>
+<li>All platforms. This being a feature was a bug. See <a href="https://github.com/gfx-rs/wgpu/issues/3112">#3112</a></li>
 </ul>
 <p>This is a web and native feature.</p>
 </div></details><details class="rustdoc-toggle" open><summary><section id="associatedconstant.DEPTH32FLOAT_STENCIL8" class="associatedconstant has-srclink"><h4 class="code-header">pub const <a href="#associatedconstant.DEPTH32FLOAT_STENCIL8" class="constant">DEPTH32FLOAT_STENCIL8</a>: <a class="struct" href="struct.Features.html" title="struct maplibre::render::settings::Features">Features</a> = Self{bits: 1 &lt;&lt; 2,}</h4></section></summary><div class="docblock"><p>Allows for explicit creation of textures of format <a href="enum.TextureFormat.html#variant.Depth32FloatStencil8" title="TextureFormat::Depth32FloatStencil8"><code>TextureFormat::Depth32FloatStencil8</code></a></p>
