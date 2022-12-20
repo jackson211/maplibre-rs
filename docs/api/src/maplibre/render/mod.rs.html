@@ -525,6 +525,12 @@
 <span id="525">525</span>
 <span id="526">526</span>
 <span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module implements the rendering algorithm of maplibre-rs. It manages the whole
 //! communication with the GPU.
 //!
@@ -547,8 +553,6 @@
 
 </span><span class="kw">use </span>std::sync::Arc;
 
-<span class="kw">use </span>log::info;
-
 <span class="kw">use crate</span>::{
     render::{
         eventually::Eventually,
@@ -556,7 +560,7 @@
         resource::{BufferPool, Globals, Head, IndexEntry, Surface, Texture, TextureView},
         settings::{RendererSettings, WgpuSettings},
         shaders::{ShaderFeatureStyle, ShaderLayerMetadata},
-        tile_view_pattern::{TileInView, TileShape, TileViewPattern},
+        tile_view_pattern::{TileShape, TileViewPattern},
     },
     tessellation::IndexDataType,
 };
@@ -566,7 +570,8 @@
 <span class="kw">pub mod </span>stages;
 
 <span class="comment">// Rendering internals
-</span><span class="kw">mod </span>graph_runner;
+</span><span class="kw">mod </span>debug_pass;
+<span class="kw">mod </span>graph_runner;
 <span class="kw">mod </span>main_pass;
 <span class="kw">mod </span>render_commands;
 <span class="kw">mod </span>render_phase;
@@ -586,6 +591,8 @@
 
 <span class="kw">use crate</span>::{
     render::{
+        debug_pass::DebugPassNode,
+        error::RenderError,
         graph::{EmptyNode, RenderGraph, RenderGraphError},
         main_pass::{MainPassDriverNode, MainPassNode},
     },
@@ -611,6 +618,7 @@
 
     tile_pipeline: Eventually&lt;wgpu::RenderPipeline&gt;,
     mask_pipeline: Eventually&lt;wgpu::RenderPipeline&gt;,
+    debug_pipeline: Eventually&lt;wgpu::RenderPipeline&gt;,
 
     globals_bind_group: Eventually&lt;Globals&gt;,
 
@@ -619,7 +627,7 @@
 
     surface: Surface,
 
-    mask_phase: RenderPhase&lt;TileInView&gt;,
+    mask_phase: RenderPhase&lt;TileShape&gt;,
     tile_phase: RenderPhase&lt;(IndexEntry, TileShape)&gt;,
 }
 
@@ -631,6 +639,7 @@
             tile_view_pattern: Default::default(),
             tile_pipeline: Default::default(),
             mask_pipeline: Default::default(),
+            debug_pipeline: Default::default(),
             globals_bind_group: Default::default(),
             depth_texture: Default::default(),
             multisampling_texture: Default::default(),
@@ -671,7 +680,7 @@
     <span class="kw">pub </span>instance: wgpu::Instance,
     <span class="kw">pub </span>device: Arc&lt;wgpu::Device&gt;, <span class="comment">// TODO: Arc is needed for headless rendering. Is there a simpler solution?
     </span><span class="kw">pub </span>queue: wgpu::Queue,
-    <span class="kw">pub </span>adapter_info: wgpu::AdapterInfo,
+    <span class="kw">pub </span>adapter: wgpu::Adapter,
 
     <span class="kw">pub </span>wgpu_settings: WgpuSettings,
     <span class="kw">pub </span>settings: RendererSettings,
@@ -686,29 +695,26 @@
         window: <span class="kw-2">&amp;</span>MW,
         wgpu_settings: WgpuSettings,
         settings: RendererSettings,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, wgpu::RequestDeviceError&gt;
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, RenderError&gt;
     <span class="kw">where
         </span>MW: MapWindow + HeadedMapWindow,
     {
         <span class="kw">let </span>instance = wgpu::Instance::new(wgpu_settings.backends.unwrap_or(wgpu::Backends::all()));
 
-        <span class="kw">let </span>surface = Surface::from_window(<span class="kw-2">&amp;</span>instance, window, <span class="kw-2">&amp;</span>settings);
+        <span class="kw">let </span>surface: wgpu::Surface = <span class="kw">unsafe </span>{ instance.create_surface(window.raw()) };
 
-        <span class="kw">let </span>compatible_surface = <span class="kw">match </span><span class="kw-2">&amp;</span>surface.head() {
-            Head::Headed(window_head) =&gt; <span class="prelude-val">Some</span>(window_head.surface()),
-            Head::Headless(<span class="kw">_</span>) =&gt; <span class="prelude-val">None</span>,
-        };
-
-        <span class="kw">let </span>(device, queue, adapter_info) = <span class="self">Self</span>::request_device(
+        <span class="kw">let </span>(adapter, device, queue) = <span class="self">Self</span>::request_device(
             <span class="kw-2">&amp;</span>instance,
             <span class="kw-2">&amp;</span>wgpu_settings,
             <span class="kw-2">&amp;</span>wgpu::RequestAdapterOptions {
                 power_preference: wgpu_settings.power_preference,
                 force_fallback_adapter: <span class="bool-val">false</span>,
-                compatible_surface,
+                compatible_surface: <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>surface),
             },
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let </span>surface = Surface::from_surface(surface, <span class="kw-2">&amp;</span>adapter, window, <span class="kw-2">&amp;</span>settings);
 
         <span class="kw">match </span>surface.head() {
             Head::Headed(window) =&gt; window.configure(<span class="kw-2">&amp;</span>device),
@@ -719,7 +725,7 @@
             instance,
             device: Arc::new(device),
             queue,
-            adapter_info,
+            adapter,
             wgpu_settings,
             settings,
             state: RenderState::new(surface),
@@ -730,13 +736,13 @@
         window: <span class="kw-2">&amp;</span>MW,
         wgpu_settings: WgpuSettings,
         settings: RendererSettings,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, wgpu::RequestDeviceError&gt;
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, RenderError&gt;
     <span class="kw">where
         </span>MW: MapWindow,
     {
         <span class="kw">let </span>instance = wgpu::Instance::new(wgpu_settings.backends.unwrap_or(wgpu::Backends::all()));
 
-        <span class="kw">let </span>(device, queue, adapter_info) = <span class="self">Self</span>::request_device(
+        <span class="kw">let </span>(adapter, device, queue) = <span class="self">Self</span>::request_device(
             <span class="kw-2">&amp;</span>instance,
             <span class="kw-2">&amp;</span>wgpu_settings,
             <span class="kw-2">&amp;</span>wgpu::RequestAdapterOptions {
@@ -753,7 +759,7 @@
             instance,
             device: Arc::new(device),
             queue,
-            adapter_info,
+            adapter,
             wgpu_settings,
             settings,
             state: RenderState::new(surface),
@@ -769,14 +775,13 @@
         instance: <span class="kw-2">&amp;</span>wgpu::Instance,
         settings: <span class="kw-2">&amp;</span>WgpuSettings,
         request_adapter_options: <span class="kw-2">&amp;</span>wgpu::RequestAdapterOptions&lt;<span class="lifetime">&#39;_</span>&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(wgpu::Device, wgpu::Queue, wgpu::AdapterInfo), wgpu::RequestDeviceError&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(wgpu::Adapter, wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError&gt; {
         <span class="kw">let </span>adapter = instance
             .request_adapter(request_adapter_options)
             .<span class="kw">await
-            </span>.expect(<span class="string">&quot;Unable to find a GPU! Make sure you have installed required drivers!&quot;</span>);
+            </span>.ok_or(wgpu::RequestDeviceError)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>adapter_info = adapter.get_info();
-        <span class="macro">info!</span>(<span class="string">&quot;{:?}&quot;</span>, adapter_info);
 
         <span class="attribute">#[cfg(not(target_arch = <span class="string">&quot;wasm32&quot;</span>))]
         </span><span class="kw">let </span>trace_path = <span class="kw">if </span>settings.record_trace {
@@ -914,7 +919,7 @@
                 trace_path,
             )
             .<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>((device, queue, adapter_info))
+        <span class="prelude-val">Ok</span>((adapter, device, queue))
     }
 
     <span class="kw">pub fn </span>instance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>wgpu::Instance {
@@ -1029,6 +1034,7 @@
     <span class="comment">// Labels for non-input nodes
     </span><span class="kw">pub mod </span>node {
         <span class="kw">pub const </span>MAIN_PASS: <span class="kw-2">&amp;</span>str = <span class="string">&quot;main_pass&quot;</span>;
+        <span class="kw">pub const </span>DEBUG_PASS: <span class="kw-2">&amp;</span>str = <span class="string">&quot;debug_pass&quot;</span>;
         <span class="attribute">#[cfg(feature = <span class="string">&quot;headless&quot;</span>)]
         </span><span class="kw">pub const </span>COPY: <span class="kw-2">&amp;</span>str = <span class="string">&quot;copy&quot;</span>;
     }
@@ -1038,9 +1044,15 @@
     <span class="kw">let </span><span class="kw-2">mut </span>graph = RenderGraph::default();
 
     <span class="kw">let </span><span class="kw-2">mut </span>draw_graph = RenderGraph::default();
-    draw_graph.add_node(draw_graph::node::MAIN_PASS, MainPassNode::new());
-    <span class="kw">let </span>input_node_id = draw_graph.set_input(<span class="macro">vec!</span>[]);
-    draw_graph.add_node_edge(input_node_id, draw_graph::node::MAIN_PASS)<span class="question-mark">?</span>;
+    <span class="comment">// Draw nodes
+    </span>draw_graph.add_node(draw_graph::node::MAIN_PASS, MainPassNode::new());
+    draw_graph.add_node(draw_graph::node::DEBUG_PASS, DebugPassNode::new());
+    <span class="comment">// Input node
+    </span><span class="kw">let </span>input_node_id = draw_graph.set_input(<span class="macro">vec!</span>[]);
+    <span class="comment">// Edges
+    </span>draw_graph.add_node_edge(input_node_id, draw_graph::node::MAIN_PASS)<span class="question-mark">?</span>;
+    <span class="comment">// TODO: Enable debug pass via runtime flag
+    </span>draw_graph.add_node_edge(draw_graph::node::MAIN_PASS, draw_graph::node::DEBUG_PASS)<span class="question-mark">?</span>;
 
     graph.add_sub_graph(draw_graph::NAME, draw_graph);
     graph.add_node(main_graph::node::MAIN_PASS_DEPENDENCIES, EmptyNode);

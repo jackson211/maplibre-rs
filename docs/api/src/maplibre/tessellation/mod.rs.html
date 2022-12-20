@@ -110,22 +110,14 @@
 <span id="110">110</span>
 <span id="111">111</span>
 <span id="112">112</span>
-<span id="113">113</span>
-<span id="114">114</span>
-<span id="115">115</span>
-<span id="116">116</span>
-<span id="117">117</span>
-<span id="118">118</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Tessellation for lines and polygons is implemented here.
 
-</span><span class="kw">use </span>std::ops::Add;
-
-<span class="kw">use </span>bytemuck::Pod;
+</span><span class="kw">use </span>bytemuck::Pod;
 <span class="kw">use </span>lyon::tessellation::{
     FillVertex, FillVertexConstructor, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
 };
 
-<span class="kw">use crate</span>::{error::Error, render::ShaderVertex};
+<span class="kw">use </span><span class="kw">crate</span>::render::ShaderVertex;
 
 <span class="kw">pub mod </span>zero_tessellator;
 
@@ -134,15 +126,7 @@
 <span class="doccomment">/// Vertex buffers index data type.
 </span><span class="kw">pub type </span>IndexDataType = u32; <span class="comment">// Must match INDEX_FORMAT
 
-</span><span class="doccomment">/// An element that can be tessellated into vertex buffers.
-</span><span class="kw">pub trait </span>Tessellated&lt;I: Add&gt; {
-    <span class="doccomment">/// Returns a vertex buffer which represents some object like a layer. Each object can contain
-    /// multiple features. For each feature also the amount of indices is returned.
-    ///
-    </span><span class="kw">fn </span>tessellate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(VertexBuffers&lt;ShaderVertex, I&gt;, Vec&lt;u32&gt;), Error&gt;;
-}
-
-<span class="doccomment">/// Constructor for Fill and Stroke vertices.
+</span><span class="doccomment">/// Constructor for Fill and Stroke vertices.
 </span><span class="kw">pub struct </span>VertexConstructor {}
 
 <span class="kw">impl </span>FillVertexConstructor&lt;ShaderVertex&gt; <span class="kw">for </span>VertexConstructor {
@@ -175,14 +159,18 @@
         }
     }
 
-    <span class="kw">pub fn </span>from_slices(vertices: <span class="kw-2">&amp;</span>[V], indices: <span class="kw-2">&amp;</span>[I], usable_indices: u32) -&gt; <span class="self">Self
+    <span class="kw">pub fn </span>from_iters&lt;IV, II&gt;(vertices: IV, indices: II, usable_indices: u32) -&gt; <span class="self">Self
     </span><span class="kw">where
-        </span>V: Copy,
-        I: Copy,
+        </span>IV: IntoIterator&lt;Item = V&gt;,
+        II: IntoIterator&lt;Item = I&gt;,
+        IV::IntoIter: ExactSizeIterator,
+        II::IntoIter: ExactSizeIterator,
     {
-        <span class="kw">let </span><span class="kw-2">mut </span>buffers = VertexBuffers::with_capacity(<span class="number">0</span>, <span class="number">0</span>);
-        buffers.vertices = Vec::from(vertices);
-        buffers.indices = Vec::from(indices);
+        <span class="kw">let </span>vertices = vertices.into_iter();
+        <span class="kw">let </span>indices = indices.into_iter();
+        <span class="kw">let </span><span class="kw-2">mut </span>buffers = VertexBuffers::with_capacity(vertices.len(), indices.len());
+        buffers.vertices.extend(vertices);
+        buffers.indices.extend(indices);
         <span class="self">Self </span>{
             buffer: buffers,
             usable_indices,
