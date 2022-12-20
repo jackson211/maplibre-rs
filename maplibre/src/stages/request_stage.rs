@@ -2,17 +2,18 @@
 
 use std::{collections::HashSet, rc::Rc};
 
+use log::info;
+
 use crate::{
     context::MapContext,
     coords::{ViewRegion, WorldTileCoords},
     environment::Environment,
-    error::Error,
     io::{
-        apc::{AsyncProcedureCall, AsyncProcedureFuture, Context, Input, Message},
+        apc::{AsyncProcedureCall, AsyncProcedureFuture, Context, Input, Message, ProcedureError},
         pipeline::{PipelineContext, Processable},
         tile_pipelines::build_vector_tile_pipeline,
         tile_repository::TileRepository,
-        transferables::{Transferables, UnavailableLayer},
+        transferables::{LayerUnavailable, Transferables},
         TileRequest,
     },
     kernel::Kernel,
@@ -70,8 +71,10 @@ pub fn schedule<
     context: C,
 ) -> AsyncProcedureFuture {
     Box::pin(async move {
+        info!("Processing thread: {:?}", std::thread::current().name());
+
         let Input::TileRequest(input) = input else {
-            return Err(Error::APC)
+            return Err(ProcedureError::IncompatibleInput)
         };
 
         let coords = input.coords;
@@ -87,7 +90,9 @@ pub fn schedule<
                     phantom_hc: Default::default(),
                 });
                 let pipeline = build_vector_tile_pipeline();
-                pipeline.process((input, data), &mut pipeline_context)?;
+                pipeline
+                    .process((input, data), &mut pipeline_context)
+                    .map_err(|e| ProcedureError::Execution(Box::new(e)))?;
             }
             Err(e) => {
                 log::error!("{:?}", &e);
@@ -96,11 +101,11 @@ pub fn schedule<
                     context.send(
                         Message::LayerUnavailable(<<E::AsyncProcedureCall as AsyncProcedureCall<
                             E::HttpClient,
-                        >>::Transferables as Transferables>::LayerUnavailable::new(
+                        >>::Transferables as Transferables>::LayerUnavailable::build_from(
                             input.coords,
                             to_load.to_string(),
                         )),
-                    )?;
+                    ).map_err(ProcedureError::Send)?;
                 }
             }
         }
@@ -126,8 +131,7 @@ impl<E: Environment> RequestStage<E> {
         for coords in view_region.iter() {
             if coords.build_quad_key().is_some() {
                 // TODO: Make tesselation depend on style?
-                self.request_tile(tile_repository, coords, &source_layers)
-                    .unwrap(); // TODO: Remove unwrap
+                self.request_tile(tile_repository, coords, &source_layers);
             }
         }
     }
@@ -137,30 +141,25 @@ impl<E: Environment> RequestStage<E> {
         tile_repository: &mut TileRepository,
         coords: WorldTileCoords,
         layers: &HashSet<String>,
-    ) -> Result<(), Error> {
-        /* TODO: is this still required?
-        if !tile_repository.is_layers_missing(coords, layers) {
-            return Ok(false);
-        }*/
+    ) {
+        if tile_repository.is_tile_pending_or_done(&coords) {
+            tile_repository.mark_tile_pending(coords).unwrap(); // TODO: Remove unwrap
 
-        if tile_repository.has_tile(&coords) {
-            tile_repository.create_tile(coords);
+            tracing::event!(tracing::Level::ERROR, %coords, "tile request started: {}", &coords);
 
-            tracing::info!("new tile request: {}", &coords);
-            self.kernel.apc().call(
-                Input::TileRequest(TileRequest {
-                    coords,
-                    layers: layers.clone(),
-                }),
-                schedule::<
-                    E,
-                    <E::AsyncProcedureCall as AsyncProcedureCall<
-                        E::HttpClient,
-                    >>::Context,
-                >,
-            );
+            self.kernel
+                .apc()
+                .call(
+                    Input::TileRequest(TileRequest {
+                        coords,
+                        layers: layers.clone(),
+                    }),
+                    schedule::<
+                        E,
+                        <E::AsyncProcedureCall as AsyncProcedureCall<E::HttpClient>>::Context,
+                    >,
+                )
+                .unwrap(); // TODO: Remove unwrap
         }
-
-        Ok(())
     }
 }

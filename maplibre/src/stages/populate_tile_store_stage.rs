@@ -8,7 +8,7 @@ use crate::{
     io::{
         apc::{AsyncProcedureCall, Message},
         tile_repository::StoredLayer,
-        transferables::{IndexedLayer, TessellatedLayer, TileTessellated, UnavailableLayer},
+        transferables::{LayerIndexed, LayerTessellated, LayerUnavailable, TileTessellated},
     },
     kernel::Kernel,
     schedule::Stage,
@@ -38,17 +38,20 @@ impl<E: Environment> Stage for PopulateTileStore<E> {
             ..
         }: &mut MapContext,
     ) {
-        if let Some(result) = self.kernel.apc().receive() {
+        // TODO: (optimize) Using while instead of if means that we are processing all that is
+        // available this might cause frame drops.
+        while let Some(result) = self.kernel.apc().receive() {
             match result {
+                // TODO: deduplicate
                 Message::TileTessellated(message) => {
                     let coords = message.coords();
+                    tracing::event!(tracing::Level::ERROR, %coords, "tile request done: {}", &coords);
 
                     tracing::trace!("Tile at {} finished loading", coords);
                     log::warn!("Tile at {} finished loading", coords);
 
-                    tile_repository.mark_tile_succeeded(coords);
+                    tile_repository.mark_tile_succeeded(&coords).unwrap(); // TODO: unwrap
                 }
-                // FIXME: deduplicate
                 Message::LayerUnavailable(message) => {
                     let layer: StoredLayer = message.to_stored_layer();
 
@@ -77,7 +80,7 @@ impl<E: Environment> Stage for PopulateTileStore<E> {
                     tile_repository.put_layer(layer);
                 }
                 Message::LayerIndexed(message) => {
-                    let coords = *message.coords();
+                    let coords = message.coords();
 
                     log::warn!("Layer index at {} reached main thread", coords);
 

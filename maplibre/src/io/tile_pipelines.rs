@@ -4,10 +4,9 @@ use geozero::GeozeroDatasource;
 use prost::Message;
 
 use crate::{
-    error::Error,
     io::{
         geometry_index::IndexProcessor,
-        pipeline::{DataPipeline, PipelineContext, PipelineEnd, Processable},
+        pipeline::{DataPipeline, PipelineContext, PipelineEnd, PipelineError, Processable},
         TileRequest,
     },
     tessellation::{zero_tessellator::ZeroTessellator, IndexDataType},
@@ -20,11 +19,12 @@ impl Processable for ParseTile {
     type Input = (TileRequest, Box<[u8]>);
     type Output = (TileRequest, geozero::mvt::Tile);
 
+    #[tracing::instrument(skip_all)]
     fn process(
         &self,
         (tile_request, data): Self::Input,
         _context: &mut PipelineContext,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self::Output, PipelineError> {
         let tile = geozero::mvt::Tile::decode(data.as_ref()).expect("failed to load tile");
         Ok((tile_request, tile))
     }
@@ -37,12 +37,17 @@ impl Processable for IndexLayer {
     type Input = (TileRequest, geozero::mvt::Tile);
     type Output = (TileRequest, geozero::mvt::Tile);
 
+    #[tracing::instrument(skip_all)]
     fn process(
         &self,
         (tile_request, mut tile): Self::Input,
         context: &mut PipelineContext,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self::Output, PipelineError> {
         let mut index = IndexProcessor::new();
+
+        for layer in &mut tile.layers {
+            layer.process(&mut index).unwrap();
+        }
 
         for layer in &mut tile.layers {
             layer.process(&mut index).unwrap();
@@ -62,11 +67,12 @@ impl Processable for TessellateLayer {
     type Input = (TileRequest, geozero::mvt::Tile);
     type Output = (TileRequest, geozero::mvt::Tile);
 
+    #[tracing::instrument(skip_all)]
     fn process(
         &self,
         (tile_request, mut tile): Self::Input,
         context: &mut PipelineContext,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self::Output, PipelineError> {
         let coords = &tile_request.coords;
 
         for layer in &mut tile.layers {
