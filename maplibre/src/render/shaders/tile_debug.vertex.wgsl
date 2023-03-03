@@ -12,6 +12,7 @@ fn main(
     @location(5) translate2: vec4<f32>,
     @location(6) translate3: vec4<f32>,
     @location(7) translate4: vec4<f32>,
+    @location(9) zoom_factor: f32,
     @builtin(vertex_index) vertex_idx: u32,
     @builtin(instance_index) instance_idx: u32 // instance_index is used when we have multiple instances of the same "object"
 ) -> VertexOutput {
@@ -20,7 +21,7 @@ fn main(
     let target_width = 1.0;
     let target_height = 1.0;
 
-    let WIDTH = EXTENT / 1024.0;
+    let WIDTH = EXTENT * zoom_factor / 1024.0;
 
     var VERTICES: array<vec3<f32>, 24> = array<vec3<f32>, 24>(
         // Debug lines vertices
@@ -61,7 +62,7 @@ fn main(
         vec3<f32>(EXTENT, EXTENT - WIDTH, z)
     );
 
-    let a_position = VERTICES[vertex_idx];
+    let vertex = VERTICES[vertex_idx];
 
     let scaling: mat3x3<f32> = mat3x3<f32>(
             vec3<f32>(target_width,   0.0,            0.0),
@@ -69,7 +70,7 @@ fn main(
             vec3<f32>(0.0,            0.0,            1.0)
     );
 
-    var position = mat4x4<f32>(translate1, translate2, translate3, translate4) * vec4<f32>((scaling * a_position), 1.0);
+    var position = mat4x4<f32>(translate1, translate2, translate3, translate4) * vec4<f32>((scaling * vertex), 1.0);
     position.z = 1.0;
     return VertexOutput(DEBUG_COLOR, position);
 }
