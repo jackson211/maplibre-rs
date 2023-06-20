@@ -759,6 +759,11 @@
 <span id="759">759</span>
 <span id="760">760</span>
 <span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 <span class="kw">use super</span>::{
@@ -1362,10 +1367,10 @@
         <span class="kw">pub fn </span>new(inputs: usize, outputs: usize) -&gt; <span class="self">Self </span>{
             TestNode {
                 inputs: (<span class="number">0</span>..inputs)
-                    .map(|i| SlotInfo::new(<span class="macro">format!</span>(<span class="string">&quot;in_{}&quot;</span>, i), SlotType::TextureView))
+                    .map(|i| SlotInfo::new(<span class="macro">format!</span>(<span class="string">&quot;in_{i}&quot;</span>), SlotType::TextureView))
                     .collect(),
                 outputs: (<span class="number">0</span>..outputs)
-                    .map(|i| SlotInfo::new(<span class="macro">format!</span>(<span class="string">&quot;out_{}&quot;</span>, i), SlotType::TextureView))
+                    .map(|i| SlotInfo::new(<span class="macro">format!</span>(<span class="string">&quot;out_{i}&quot;</span>), SlotType::TextureView))
                     .collect(),
             }
         }
@@ -1420,28 +1425,33 @@
         }
 
         <span class="macro">assert!</span>(input_nodes(<span class="string">&quot;A&quot;</span>, <span class="kw-2">&amp;</span>graph).is_empty(), <span class="string">&quot;A has no inputs&quot;</span>);
-        <span class="macro">assert!</span>(
-            output_nodes(<span class="string">&quot;A&quot;</span>, <span class="kw-2">&amp;</span>graph) == HashSet::from_iter(<span class="macro">vec!</span>[c_id]),
+        <span class="macro">assert_eq!</span>(
+            output_nodes(<span class="string">&quot;A&quot;</span>, <span class="kw-2">&amp;</span>graph),
+            HashSet::from_iter(<span class="macro">vec!</span>[c_id]),
             <span class="string">&quot;A outputs to C&quot;
         </span>);
 
         <span class="macro">assert!</span>(input_nodes(<span class="string">&quot;B&quot;</span>, <span class="kw-2">&amp;</span>graph).is_empty(), <span class="string">&quot;B has no inputs&quot;</span>);
-        <span class="macro">assert!</span>(
-            output_nodes(<span class="string">&quot;B&quot;</span>, <span class="kw-2">&amp;</span>graph) == HashSet::from_iter(<span class="macro">vec!</span>[c_id]),
+        <span class="macro">assert_eq!</span>(
+            output_nodes(<span class="string">&quot;B&quot;</span>, <span class="kw-2">&amp;</span>graph),
+            HashSet::from_iter(<span class="macro">vec!</span>[c_id]),
             <span class="string">&quot;B outputs to C&quot;
         </span>);
 
-        <span class="macro">assert!</span>(
-            input_nodes(<span class="string">&quot;C&quot;</span>, <span class="kw-2">&amp;</span>graph) == HashSet::from_iter(<span class="macro">vec!</span>[a_id, b_id]),
+        <span class="macro">assert_eq!</span>(
+            input_nodes(<span class="string">&quot;C&quot;</span>, <span class="kw-2">&amp;</span>graph),
+            HashSet::from_iter(<span class="macro">vec!</span>[a_id, b_id]),
             <span class="string">&quot;A and B input to C&quot;
         </span>);
-        <span class="macro">assert!</span>(
-            output_nodes(<span class="string">&quot;C&quot;</span>, <span class="kw-2">&amp;</span>graph) == HashSet::from_iter(<span class="macro">vec!</span>[d_id]),
+        <span class="macro">assert_eq!</span>(
+            output_nodes(<span class="string">&quot;C&quot;</span>, <span class="kw-2">&amp;</span>graph),
+            HashSet::from_iter(<span class="macro">vec!</span>[d_id]),
             <span class="string">&quot;C outputs to D&quot;
         </span>);
 
-        <span class="macro">assert!</span>(
-            input_nodes(<span class="string">&quot;D&quot;</span>, <span class="kw-2">&amp;</span>graph) == HashSet::from_iter(<span class="macro">vec!</span>[c_id]),
+        <span class="macro">assert_eq!</span>(
+            input_nodes(<span class="string">&quot;D&quot;</span>, <span class="kw-2">&amp;</span>graph),
+            HashSet::from_iter(<span class="macro">vec!</span>[c_id]),
             <span class="string">&quot;C inputs to D&quot;
         </span>);
         <span class="macro">assert!</span>(output_nodes(<span class="string">&quot;D&quot;</span>, <span class="kw-2">&amp;</span>graph).is_empty(), <span class="string">&quot;D has no outputs&quot;</span>);
