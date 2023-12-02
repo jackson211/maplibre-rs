@@ -4,10 +4,14 @@
 
 set shell := ["bash", "-c"]
 
-#  Also change the version in android/gradle/lib/build.gradle
+# Keep this in sync with `android/gradle/lib/build.gradle`
 
-export NIGHTLY_TOOLCHAIN := "nightly-2023-03-29"
-export STABLE_TOOLCHAIN := "1.65"
+export NIGHTLY_TOOLCHAIN := "nightly-2023-09-23"
+
+# Keep this in sync with `rust-toolchain.toml` and `Cargo.toml`.
+# Make sure the above is newer than this.
+
+export STABLE_TOOLCHAIN := "1.73"
 export CARGO_TERM_COLOR := "always"
 export RUST_BACKTRACE := "1"
 
@@ -182,6 +186,9 @@ xcodebuild-xcframework:
     echo "XC_FRAMEWORK_PATH: $XC_FRAMEWORK_PATH"
     echo "$framework_args" | xargs xcodebuild -create-xcframework -output "$XC_FRAMEWORK_PATH"
     cat "$XC_FRAMEWORK_PATH/Info.plist"
+
+book-serve:
+    cd docs && ./generate-summary.sh && mdbook serve
 
 # language=bash
 extract-tiles:
